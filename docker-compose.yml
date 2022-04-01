@@ -1,0 +1,60 @@
+version: '3.9'
+
+volumes:
+  postgres_data:
+    driver: local
+
+services:
+  postgres:
+    image: postgis/postgis:12-master
+    container_name: urclimate-database
+    volumes:
+      - postgres_data:/var/lib/postgresql/urclimate
+      - ./init_script:/docker-entrypoint-initdb.d
+    environment:
+      POSTGRES_DB: urclimate
+      POSTGRES_USER: spring-app
+      POSTGRES_PASSWORD: password
+    restart: always
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready"]
+      interval: 10s
+      timeout: 30s
+      retries: 10
+    ports:
+      - 5432:5432
+  urclimate:
+    image: cantaylancapraz/urclimate
+    ports:
+    - 8080:8080
+    environment:
+      - DATABASE_ENDPOINT=postgres
+      - DATABASE_USER=spring-app
+      - DATABASE_PASSWORD=password
+      - DATABASE_NAME=urclimate
+      - URCLIMATE_SECURITY_ADMIN_USERNAME=ccUKM9w3g1zoqyxt
+      - URCLIMATE_SECURITY_ADMIN_PASSWORD="$$2a$$10$$mGl/IZ.YVWr6kJnwMmQ4g.M6qLVPXnP8kqfyDpl2MaRqqoYbHH66a"
+    restart: always
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/actuator/health"]
+      interval: 10s
+      timeout: 30s
+      retries: 10
+    depends_on:
+      postgres:
+        condition: service_healthy
+  geoserver:
+    image: terrestris/geoserver:2.19.2
+    restart: always
+    ports:
+      - 1235:8080
+    depends_on:
+      - postgres
+    volumes:
+      - ./geoserver_data:/opt/geoserver_data:Z
+      - ./geoserver/additional_libs:/opt/additional_libs:Z
+    healthcheck:
+      test: ["CMD", "wget", "http://localhost:8080/geoserver/index.html"]
+      interval: 10s
+      timeout: 30s
+      retries: 10
